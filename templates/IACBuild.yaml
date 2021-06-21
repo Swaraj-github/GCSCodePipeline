@@ -1,0 +1,131 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  ServiceName:
+    Type: String
+  ProjectName:
+    Type: String
+  BuildRoleArn:
+    Type: String
+  AccountId:
+    Type: String
+  VpcId:
+    Type: String
+  PrivateSubnets:
+    Type: "List<AWS::EC2::Subnet::Id>"
+  AssetInsightId:
+    Type: String
+  FinancialIdentifier:
+    Type: String
+  ResourceOwner:
+    Type: String
+  EnvironmentType:
+    Type: String
+  Environment:
+    Type: String
+  SNSTci:
+    Type: String
+
+Resources:
+  CBSecurityGroup:
+    Properties:
+      GroupDescription: !Sub a${AssetInsightId}-${ServiceName}-${ProjectName}-${Environment} - IaC Codebuild
+      GroupName: !Sub a${AssetInsightId}-${ServiceName}-${ProjectName}-${Environment}-iac-codebuild
+      Tags:
+      - Key: tr:application-asset-insight-id
+        Value: !Ref AssetInsightId
+      - Key: tr:financial-identifier
+        Value: !Ref FinancialIdentifier
+      - Key: tr:project-name
+        Value: !Ref ProjectName
+      - Key: tr:resource-owner
+        Value: !Ref ResourceOwner
+      - Key: tr:service-name
+        Value: !Ref ServiceName
+      VpcId: vpc-094cbded22df17847 #OI How do this
+    Type: AWS::EC2::SecurityGroup
+  IACBuild:
+    Properties:
+      Artifacts:
+        Name: IACOUT
+        Type: CODEPIPELINE
+      Description: !Sub a${AssetInsightId}-${ServiceName}-${ProjectName} IaC tool. Environment- ${Environment}
+      Environment:
+        ImagePullCredentialsType: SERVICE_ROLE
+        ComputeType: BUILD_GENERAL1_SMALL
+        EnvironmentVariables:
+        - Name: "REGION"
+          Value:
+            Ref: "AWS::Region"
+        - Name: REPO_NAME
+          Value:
+            Ref: AssetInsightId
+        - Name: ENV_NAME
+          Value:
+            Ref: Environment
+        - Name: APPROVAL_SNS
+          Value:
+            Ref: SNSTci
+        - Name: APP_NAME
+          Value:
+            Ref: ServiceName
+        - Name: NEXT_ENV_SOURCE
+          Value:
+            Fn::Join:
+            - "/"
+            - - a206153-storage-source
+              - qacdtesting/qa/execute/config.zip
+        - Name: NOTIFICATION_SNS
+          Value:
+            Ref: SNSTci
+        Image: 460300312212.dkr.ecr.us-east-1.amazonaws.com/a204503/cloud-iac:1.5.3b1574882805
+        PrivilegedMode: true
+        Type: LINUX_CONTAINER
+      Name: !Sub a${AssetInsightId}-${ServiceName}-${ProjectName}-iac-${Environment}
+      ServiceRole: !Ref BuildRoleArn
+      Source:
+        BuildSpec: |
+          version: 0.2
+          env:
+            variables:
+              HTTPS_PROXY: "webproxy.int.westgroup.com:80"
+          phases:
+            install:
+              commands:
+                - apt-get update -y
+                - apt-get install -y rsync
+                - apt-get install -y jq
+            build:
+              commands:
+                - cd $CODEBUILD_SRC_DIR
+                - cloud-iac deployer execute $ENV_NAME
+        Type: CODEPIPELINE
+      Tags:
+      - Key: tr:application-asset-insight-id
+        Value: !Ref AssetInsightId
+      - Key: tr:environment-name
+        Value: !Ref Environment
+      - Key: tr:environment-type
+        Value: !Ref EnvironmentType
+      - Key: tr:financial-identifier
+        Value: !Ref FinancialIdentifier
+      - Key: tr:project-name
+        Value: !Ref ProjectName
+      - Key: tr:resource-owner
+        Value: !Ref ResourceOwner
+      - Key: tr:service-name
+        Value: !Ref ServiceName
+      TimeoutInMinutes: 480
+      VpcConfig:
+        SecurityGroupIds:
+        - Fn::GetAtt:
+          - CBSecurityGroup
+          - GroupId
+        Subnets:
+          Ref: "PrivateSubnets"
+        VpcId: !Ref VpcId
+    Type: AWS::CodeBuild::Project
+
+Outputs:
+  BuildArn:
+    Value: !GetAtt IACBuild.Arn
