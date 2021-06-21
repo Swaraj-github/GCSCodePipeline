@@ -1,0 +1,20 @@
+accounts:
+- '689314585043'
+archive_name: storage-pipeline/cicd/execute/config.zip
+asset_insight_id: '206153'
+deployment_engine_version: 1.5.3
+environment_order:
+- cicd
+financial_identifier: '66497'
+github_branch: master
+github_owner: tr
+github_repo: gcs-dss_lambda-activities-pipeline
+log_retention: 90
+project_code: a206153-storage-dss
+project_name: dss
+region: us-east-1
+resource_owner: TR-DEVOPS-GCS-DSS@thomson.com
+service_name: storage
+source_bucket: a206153-storage-source
+template_bucket_name: a206153-storage-iac-source
+template_key_prefix: storage-deployment
