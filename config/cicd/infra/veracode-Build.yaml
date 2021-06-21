@@ -1,0 +1,24 @@
+template_path: templates/VeracodeScan.yaml
+
+parameters:
+  Environment: {{ var.CiEnvShortName }}
+  ServiceName: {{ var.ServiceName }}
+  ProjectName: {{ var.ProjectName }}
+  BuildRoleArn: {{ var.BuildRoleArn }}
+  AccountId: "{{ var.CicdProdAccountId }}"
+  VpcId: {{ var.CicdProdVpcId }}
+  PrivateSubnets: {{ var.CicdProdPrivateSubnets }}
+  AssetInsightId: "{{ var.AssetInsightId }}"
+  FinancialIdentifier: "{{ var.FinancialIdentifier }}"
+  ResourceOwner: {{ var.ResourceOwner }}
+  EnvironmentType: {{ var.CiEnvFullName }}
+  VeracodeApplicationName: {{ var.VeracodeApplicationName }}
+  VeracodeApplicationId: "{{ var.VeracodeApplicationId }}"
+  VeracodeProjectCodeName: {{ var.VeracodeProjectCodeName }}
+  VeracodeSandboxId: "{{ var.VeracodeSandboxId }}"
+
+stack_tags:
+  "tr:financial-identifier": "{{ var.FinancialIdentifier }}"
+  "tr:application-asset-insight-id": "{{ var.AssetInsightId }}"
+  "tr:environment-type": {{ var.CiEnvFullName }}
+  "tr:resource-owner": {{ var.ResourceOwner }}
