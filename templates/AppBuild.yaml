@@ -1,0 +1,137 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  ServiceName:
+    Type: String
+  ProjectName:
+    Type: String
+  BuildRoleArn:
+    Type: String
+  AccountId:
+    Type: String
+  VpcId:
+    Type: String
+  PrivateSubnets:
+    Type: "List<AWS::EC2::Subnet::Id>"
+  AssetInsightId:
+    Type: String
+  FinancialIdentifier:
+    Type: String
+  ResourceOwner:
+    Type: String
+  EnvironmentType:
+    Type: String
+  Environment:
+    Type: String
+
+Resources:
+  AppBuild:
+    Type: "AWS::CodeBuild::Project"
+    Properties:
+      Name:
+        Fn::Sub: "a${AssetInsightId}-${ServiceName}-${ProjectName}-Build"
+      ServiceRole:
+        Ref: "BuildRoleArn"
+      Artifacts:
+        ArtifactIdentifier: "APP"
+        Type: "CODEPIPELINE"
+        Packaging: "ZIP"
+      Environment:
+        Type: "LINUX_CONTAINER"
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/standard:2.0"
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: "SECURITY_GROUP_ID"
+            Value:
+              Ref: "BuildSecurityGroup"
+          - Name: "SUBNET_ID"
+            Value:
+              Fn::Select: [0, {"Ref": "PrivateSubnets"}]
+          - Name: "VPC_ID"
+            Value:
+              Ref: "VpcId"
+          - Name: "ASSET_ID"
+            Value:
+              Ref: "AssetInsightId"
+          - Name: "FINANCIAL_ID"
+            Value:
+              Ref: "FinancialIdentifier"
+          - Name: "ENVIRONMENT_TYPE"
+            Value:
+              Ref: "EnvironmentType"
+          - Name: "RESOURCE_OWNER"
+            Value:
+              Ref: "ResourceOwner"
+          - Name: "REGION"
+            Value:
+              Ref: "AWS::Region"
+          - Name: "ACCOUNT_ID"
+            Value:
+              Ref: "AccountId"
+          - Name: "SERVICE_NAME"
+            Value:
+              Ref: "ServiceName"
+      Source:
+        Type: "CODEPIPELINE"
+      TimeoutInMinutes: 30
+      VpcConfig:
+        SecurityGroupIds: [{Ref: "BuildSecurityGroup"}]
+        Subnets:
+          Ref: "PrivateSubnets"
+        VpcId:
+          Ref: "VpcId"
+      Tags:
+        - Key: "tr:application-asset-insight-id"
+          Value:
+            Ref: "AssetInsightId"
+        - Key: "tr:financial-identifier"
+          Value:
+            Ref: "FinancialIdentifier"
+        - Key: "tr:environment-type"
+          Value:
+            Ref: "EnvironmentType"
+        - Key: "tr:resource-owner"
+          Value:
+            Ref: "ResourceOwner"
+
+  BuildSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Security group that is applied to build resources"
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: "0.0.0.0/0"
+      Tags:
+        - Key: "tr:application-asset-insight-id"
+          Value:
+            Ref: "AssetInsightId"
+        - Key: "tr:financial-identifier"
+          Value:
+            Ref: "FinancialIdentifier"
+        - Key: "tr:environment-type"
+          Value:
+            Ref: "EnvironmentType"
+        - Key: "tr:resource-owner"
+          Value:
+            Ref: "ResourceOwner"
+      VpcId:
+        Ref: "VpcId"
+
+  SelfRule:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    Properties:
+      Description: "Allow resources in group to talk to eachother"
+      IpProtocol: -1
+      FromPort: -1
+      ToPort: -1
+      GroupId:
+        Ref: "BuildSecurityGroup"
+      SourceSecurityGroupId:
+        Ref: "BuildSecurityGroup"
+
+Outputs:
+  BuildArn:
+    Value: !GetAtt AppBuild.Arn
