@@ -1,0 +1,220 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  ServiceName:
+    Type: String
+  ProjectName:
+    Type: String
+  BuildRoleArn:
+    Type: String
+  AccountId:
+    Type: String
+  VpcId:
+    Type: String
+  PrivateSubnets:
+    Type: "List<AWS::EC2::Subnet::Id>"
+  AssetInsightId:
+    Type: String
+  FinancialIdentifier:
+    Type: String
+  ResourceOwner:
+    Type: String
+  EnvironmentType:
+    Type: String
+  Environment:
+    Type: String
+  VeracodeApplicationName:
+    Type: String
+  VeracodeApplicationId:
+    Type: String
+  VeracodeProjectCodeName:
+    Type: String
+  VeracodeSandboxId:
+    Type: String
+
+Resources:
+  AppBuild:
+    Type: "AWS::CodeBuild::Project"
+    Properties:
+      Name:
+        Fn::Sub: "a206153-s-kannothu-lambda-deploy-veracode-Build"
+      ServiceRole:
+        Ref: "BuildRoleArn"
+      Artifacts:
+        ArtifactIdentifier: "APP"
+        Type: "CODEPIPELINE"
+        Packaging: "ZIP"
+      Environment:
+        Type: "LINUX_CONTAINER"
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/standard:2.0"
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: "SECURITY_GROUP_ID"
+            Value:
+              Ref: "BuildSecurityGroup"
+          - Name: "SUBNET_ID"
+            Value:
+              Fn::Select: [0, {"Ref": "PrivateSubnets"}]
+          - Name: "VPC_ID"
+            Value:
+              Ref: "VpcId"
+          - Name: "ASSET_ID"
+            Value:
+              Ref: "AssetInsightId"
+          - Name: "FINANCIAL_ID"
+            Value:
+              Ref: "FinancialIdentifier"
+          - Name: "ENVIRONMENT_TYPE"
+            Value:
+              Ref: "EnvironmentType"
+          - Name: "RESOURCE_OWNER"
+            Value:
+              Ref: "ResourceOwner"
+          - Name: "REGION"
+            Value:
+              Ref: "AWS::Region"
+          - Name: "ACCOUNT_ID"
+            Value:
+              Ref: "AccountId"
+          - Name: "SERVICE_NAME"
+            Value:
+              Ref: "ServiceName"
+          - Name: "VERACODE_APPLICATION_NAME"
+            Value:
+              Ref: "VeracodeApplicationName"
+          - Name: "VERACODE_APPLICATION_ID"
+            Value:
+              Ref: "VeracodeApplicationId"
+          - Name: "PROJECT_CODE_NAME"
+            Value:
+              Ref: "VeracodeProjectCodeName"
+          - Name: "VERACODE_SANDBOX_ID"
+            Value:
+              Ref: "VeracodeSandboxId"
+
+      Source:
+        BuildSpec: |
+          version: 0.2
+          env:
+            variables:
+              HTTPS_PROXY: "webproxy.int.westgroup.com:80"
+            parameter-store:
+              VERACODE_ID: "/a206153/veracode/id"
+              VERACODE_KEY: "/a206153/veracode/key"
+          phases:
+            install:
+              commands:
+            build:
+              commands:
+                - echo `cat templates/packaged-sam-template.yaml`
+                - echo "import yaml;yaml_dict_s3path1=[];sam_yaml_file = open('templates/packaged-sam-template.yaml');parsed_yaml_file = yaml.load(sam_yaml_file, Loader=yaml.FullLoader);yaml_dict_s3path1=[value['Properties']['CodeUri']+"\"/\""+key for key,value in parsed_yaml_file['Resources'].items() if value['Type'] == 'AWS::Serverless::Function'];print("\",\"".join(yaml_dict_s3path1))" > yaml_parser.py
+                - echo `cat yaml_parser.py`
+                - artefacts3location=`python yaml_parser.py`
+                - echo ${artefacts3location}
+                - |
+                  if [ `echo ${artefacts3location} | wc -l` -gt 0 ]; then
+                    echo "Application code found for vercode scanning"
+                    artefactpath=veracode_scan
+                    wget "https://repo1.maven.org/maven2/com/veracode/vosp/api/wrappers/vosp-api-wrappers-java/maven-metadata.xml" -O veracode_maven_metadata.xml
+                    echo `cat veracode_maven_metadata.xml`
+                    latest_veracode_version=$(cat veracode_maven_metadata.xml | grep latest | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
+                    echo ${latest_veracode_version}
+                    wget "https://repo1.maven.org/maven2/com/veracode/vosp/api/wrappers/vosp-api-wrappers-java/${latest_veracode_version}/vosp-api-wrappers-java-${latest_veracode_version}.jar" -O VeracodeJavaAPI.jar
+                    echo `ls -lrt`
+                    chmod 777 VeracodeJavaAPI.jar
+                    mkdir ${artefactpath}
+                    DATE=`date "+%Y%m%d%H%M%S"`
+                    echo ${DATE}
+                    hyphen="-"
+                    codeversion="${PROJECT_CODE_NAME}"${hyphen}${DATE}
+                    export IFS=","
+                    for artefacts3locationitem in ${artefacts3location}; do
+                     codename=`echo ${artefacts3locationitem} | awk -F/ '{print $NF}'`
+                     artefacts3=`echo ${artefacts3locationitem} | awk -F/ '{print $(NF-1)}'`
+                     artefactname=${codename}${hyphen}${artefacts3}.zip;echo ${artefactname}
+                     artefacts3locationitem=`echo ${artefacts3locationitem} | awk -F/ '{print $1"/"$2"/"$3"/"$4}'`
+                     aws s3 cp ${artefacts3locationitem} ${artefactpath}/${artefactname}
+                    done
+                    echo `ls -lrt ${artefactpath}`
+                    java -jar VeracodeJavaAPI.jar -action getbuildinfo -vid ${VERACODE_ID} -vkey ${VERACODE_KEY} -appid ${VERACODE_APPLICATION_ID} -sandboxid ${VERACODE_SANDBOX_ID} > buildinfo.xml
+                    ver_status=`grep "status=\"Results Ready\"" buildinfo.xml | wc -l`
+                    echo `cat buildinfo.xml`
+                    if [ ${ver_status} -eq 0 ]; then
+                     echo "A Veracode scan is currently in progress or incomplete. Deleting the previous scan."
+                     java -jar VeracodeJavaAPI.jar -action deletebuild -vid ${VERACODE_ID} -vkey ${VERACODE_KEY} -appid ${VERACODE_APPLICATION_ID} -sandboxid ${VERACODE_SANDBOX_ID}
+                    fi
+                    java -jar VeracodeJavaAPI.jar -action getbuildinfo -vid ${VERACODE_ID} -vkey ${VERACODE_KEY} -appid ${VERACODE_APPLICATION_ID} -sandboxid ${VERACODE_SANDBOX_ID} > buildinfo.xml
+                    ver_status=`grep "status=\"Results Ready\"" buildinfo.xml | wc -l`
+                    echo `cat buildinfo.xml`
+                    if [ ${ver_status} -ne 0 ]; then
+                     echo "No Veracode scan currently in progress. Starting a new Upload and Scan."
+                     java -jar VeracodeJavaAPI.jar -action uploadandscan -vid ${VERACODE_ID} -vkey ${VERACODE_KEY} -appname "${VERACODE_APPLICATION_NAME}" -createprofile false -sandboxid ${VERACODE_SANDBOX_ID} -createsandbox false -version "${codeversion}" -filepath ${artefactpath}
+                    else
+                      echo "Not able to auto delete previous scan run which is still incomplete or in progress state, hence try to delete it manually and run Security-Scan from code pipeline."
+                    fi
+                  else
+                   echo "No code build found for veracode scan"
+                  fi
+        Type: CODEPIPELINE
+      TimeoutInMinutes: 30
+      VpcConfig:
+        SecurityGroupIds: [{Ref: "BuildSecurityGroup"}]
+        Subnets:
+          Ref: "PrivateSubnets"
+        VpcId:
+          Ref: "VpcId"
+      Tags:
+        - Key: "tr:application-asset-insight-id"
+          Value:
+            Ref: "AssetInsightId"
+        - Key: "tr:financial-identifier"
+          Value:
+            Ref: "FinancialIdentifier"
+        - Key: "tr:environment-type"
+          Value:
+            Ref: "EnvironmentType"
+        - Key: "tr:resource-owner"
+          Value:
+            Ref: "ResourceOwner"
+
+  BuildSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Security group that is applied to build resources"
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: "0.0.0.0/0"
+      Tags:
+        - Key: "tr:application-asset-insight-id"
+          Value:
+            Ref: "AssetInsightId"
+        - Key: "tr:financial-identifier"
+          Value:
+            Ref: "FinancialIdentifier"
+        - Key: "tr:environment-type"
+          Value:
+            Ref: "EnvironmentType"
+        - Key: "tr:resource-owner"
+          Value:
+            Ref: "ResourceOwner"
+      VpcId:
+        Ref: "VpcId"
+
+  SelfRule:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    Properties:
+      Description: "Allow resources in group to talk to eachother"
+      IpProtocol: -1
+      FromPort: -1
+      ToPort: -1
+      GroupId:
+        Ref: "BuildSecurityGroup"
+      SourceSecurityGroupId:
+        Ref: "BuildSecurityGroup"
+
+Outputs:
+  BuildArn:
+    Value: !GetAtt AppBuild.Arn
