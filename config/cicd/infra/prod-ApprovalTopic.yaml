@@ -1,0 +1,14 @@
+template_path: templates/ApprovalTopic.yaml
+
+parameters:
+  ServiceName: {{ var.ServiceName }}
+  ProjectName: {{ var.ProjectName }}
+  AssetInsightId: "{{ var.AssetInsightId }}"
+  Environment: {{ var.ProdEnvShortName }}
+  Email: "TR-GCS-CICD-APPROVAL-DSS@thomson.com"
+
+stack_tags:
+  "tr:financial-identifier": "{{ var.FinancialIdentifier }}"
+  "tr:application-asset-insight-id": "{{ var.AssetInsightId }}"
+  "tr:environment-type": {{ var.ProdEnvFullName }}
+  "tr:resource-owner": {{ var.ResourceOwner }}
