@@ -1,0 +1,16 @@
+template_path: templates/LambdaCWE.yaml
+
+parameters:
+  MicroserviceName: {{ var.MicroserviceName }}
+  ProjectName: {{ var.ProjectName }}
+  AssetInsightId: "{{ var.AssetInsightId }}"
+  Region: {{ var.RegionShortName }}
+  PipelineArn:  !stack_output CICD-Pipeline::PipelineArn
+  CHGLambdaARN: "arn:aws:lambda:us-east-1:689314585043:function:a206153-snow-change-use1"
+  INCLambdaArn: "arn:aws:lambda:us-east-1:689314585043:function:a206153-snow-incident-use1"
+
+stack_tags:
+  "tr:financial-identifier": "{{ var.FinancialIdentifier }}"
+  "tr:application-asset-insight-id": "{{ var.AssetInsightId }}"
+  "tr:environment-type": {{ var.CiEnvFullName }}
+  "tr:resource-owner": {{ var.ResourceOwner }}
