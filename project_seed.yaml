@@ -1,0 +1,28 @@
+project_seed:
+  accounts:
+  - '689314585043'
+  asset_insight_id: '206153'
+  financial_identifier: '66497'
+  resource_owner: TR-DEVOPS-GCS-DSS@thomson.com
+  project_name: dss
+  service_name: storage
+  source_bucket: a206153-storage-source
+  github_repo: gcs-dss_lambda-activities-pipeline
+  github_owner: tr
+  github_branch: master
+  archive_name: storage-pipeline/cicd/execute/config.zip
+  template_bucket_name: a206153-storage-iac-source
+  template_key_prefix: storage-deployment
+  deployment_engine_version: 1.5.3
+  region: us-east-1
+  log_retention: 90
+  environments:
+  - name: cicd
+    environment_type: DEVELOPMENT
+    iam_role: arn:aws:iam::689314585043:role/human-role/a206153-PowerUser2
+    notification_emails:
+    - manoj.k.pradhan@thomsonreuters.com
+    stages:
+    - name: infra
+      type: cloudformation
+    dryrun_enabled: false
