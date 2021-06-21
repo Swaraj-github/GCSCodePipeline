@@ -1,0 +1,27 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  ServiceName:
+    Type: String
+  ProjectName:
+    Type: String
+  AssetInsightId:
+    Type: String
+  Environment:
+    Type: String
+  Email:
+    Type: String
+
+Resources:
+  ApprovalTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub a${AssetInsightId}-${ServiceName}-${ProjectName}-approval-${Environment}
+      Subscription:
+        - Endpoint: !Ref Email
+          Protocol: email
+
+Outputs:
+  TopicArn:
+    Description: Arn for the SNS topic
+    Value: !Ref ApprovalTopic
