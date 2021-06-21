@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  ServiceName:
+    Type: String
+  ProjectName:
+    Type: String
+  EnvironmentFullName:
+    Type: String
+  AssetInsightId:
+    Type: String
+  ResourceOwner:
+    Type: String
+  FinancialIdentifier:
+    Type: String
+  RegionShortName:
+    Type: String
+  CicdProdAccountId:
+    Type: String
+  StoragePreprodAccountId:
+    Type: String
+  StorageProdAccountId:
+    Type: String
+
+Resources:
+  ArtifactsS3Bucket:
+    Type: AWS::S3::Bucket
+    Description: S3 bucket to store artifacts
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Sub a${AssetInsightId}-${ProjectName}-${ServiceName}-source-${RegionShortName}
+      Tags:
+        - Key: "tr:application-asset-insight-id"
+          Value: !Ref AssetInsightId
+        - Key: "tr:financial-identifier"
+          Value: !Ref FinancialIdentifier
+        - Key: "tr:environment-type"
+          Value: !Ref EnvironmentFullName
+        - Key: "tr:resource-owner"
+          Value: !Ref ResourceOwner
+
+  ArtifactsS3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ArtifactsS3Bucket
+      PolicyDocument:
+        Statement:
+          - Sid: AllowAccessCICD
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub arn:aws:iam::${CicdProdAccountId}:role/service-role/a${AssetInsightId}-CICD-Deployment
+                - !Sub arn:aws:iam::${StoragePreprodAccountId}:role/human-role/a${AssetInsightId}-PowerUser2
+                - !Sub arn:aws:iam::${StorageProdAccountId}:role/human-role/a${AssetInsightId}-PowerUser2
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+            Resource: !Join [ "", [ "arn:aws:s3:::", !Ref ArtifactsS3Bucket, "/*"] ]
+          - Sid: AllowAccessDeploy
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub arn:aws:iam::${CicdProdAccountId}:role/service-role/a${AssetInsightId}-CICD-Deployment
+                - !Sub arn:aws:iam::${StoragePreprodAccountId}:role/human-role/a${AssetInsightId}-PowerUser2
+                - !Sub arn:aws:iam::${StorageProdAccountId}:role/human-role/a${AssetInsightId}-PowerUser2
+            Action:
+              - s3:ListBucket
+              - s3:GetBucketVersioning
+            Resource: !Join [ "", [ "arn:aws:s3:::", !Ref ArtifactsS3Bucket] ]
+
+Outputs:
+  BucketName:
+    Description: Name of S3 bucket that stores artifacts
+    Value: !Ref ArtifactsS3Bucket
