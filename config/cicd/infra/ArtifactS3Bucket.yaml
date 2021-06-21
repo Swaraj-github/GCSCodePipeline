@@ -1,0 +1,18 @@
+template_path: templates/ArtifactsS3Bucket.yaml
+
+parameters:
+  ServiceName: {{ var.ServiceName }}
+  ProjectName: {{ var.ProjectName }}
+  EnvironmentFullName: {{ var.CiEnvFullName }}
+  AssetInsightId: "{{ var.AssetInsightId }}"
+  ResourceOwner: {{ var.ResourceOwner }}
+  FinancialIdentifier: "{{ var.FinancialIdentifier }}"
+  RegionShortName: {{ var.RegionShortName }}
+  CicdProdAccountId: "{{ var.CicdProdAccountId }}"
+  StoragePreprodAccountId: "{{ var.StoragePreprodAccountId }}"
+  StorageProdAccountId: "{{ var.StorageProdAccountId }}"
+stack_tags:
+  "tr:financial-identifier": "{{ var.FinancialIdentifier }}"
+  "tr:application-asset-insight-id": "{{ var.AssetInsightId }}"
+  "tr:environment-type": {{ var.CiEnvFullName }}
+  "tr:resource-owner": {{ var.ResourceOwner }}
