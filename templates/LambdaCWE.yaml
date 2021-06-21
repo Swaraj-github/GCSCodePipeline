@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  MicroserviceName:
+    Type: String
+  ProjectName:
+    Type: String
+  AssetInsightId:
+    Type: String
+  Region:
+    Type: String
+  PipelineArn:
+    Type: String
+  CHGLambdaARN:
+    Type: String
+  INCLambdaArn:
+    Type: String
+Resources:
+  TicketLambdaRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Rule used to trigger incident and change lambdas
+      EventPattern:
+        source:
+          - "aws.codepipeline"
+        detail-type:
+          - "CodePipeline Stage Execution State Change"
+        detail:
+          pipeline:
+            - !Ref PipelineArn
+          state:
+            - "FAILED"
+      Name: !Sub a${AssetInsightId}-${MicroserviceName}-${ProjectName}-ticketrule-${Region}
+      State: ENABLED
+      Targets:
+        -
+          Arn:
+            Ref: "CHGLambdaARN"
+          Id: "ChangeLambda"
+        -
+          Arn:
+            Ref: "INCLambdaArn"
+          Id: "IncidentLambda"
