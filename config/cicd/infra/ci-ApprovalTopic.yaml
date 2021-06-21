@@ -1,0 +1,14 @@
+template_path: templates/ApprovalTopic.yaml
+
+parameters:
+  ServiceName: {{ var.ServiceName }}
+  ProjectName: {{ var.ProjectName }}
+  AssetInsightId: "{{ var.AssetInsightId }}"
+  Environment: {{ var.CiEnvShortName }}
+  Email: "TR-DEVOPS-GCS-DSS@thomson.com"
+
+stack_tags:
+  "tr:financial-identifier": "{{ var.FinancialIdentifier }}"
+  "tr:application-asset-insight-id": "{{ var.AssetInsightId }}"
+  "tr:environment-type": {{ var.CiEnvFullName }}
+  "tr:resource-owner": {{ var.ResourceOwner }}
