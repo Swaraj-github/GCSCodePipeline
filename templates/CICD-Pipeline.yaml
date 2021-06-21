@@ -1,0 +1,274 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: a206153-gcs-dss-lambda Code CI/CD pipeline
+Parameters:
+  OutputBucket:
+    Type: String
+  ServiceName:
+    Type: String
+  ProjectName:
+    Type: String
+  BuildRoleArn:
+    Type: String
+  AssetInsightId:
+    Type: String
+  Region:
+    Type: String
+  AppBuildArn:
+    Type: String
+  DEVIACBuildArn:
+    Type: String
+  CIIACBuildArn:
+    Type: String
+  ChgLambdaName:
+    Type: String
+  QAIACBuildArn:
+    Type: String
+  PRODIACBuildArn:
+    Type: String
+  GitHubProjectName:
+    Type: String
+  GitHubBranchName:
+    Type: String
+  PRODApprovalTopic:
+    Type: String
+  QAApprovalTopic:
+    Type: String
+  CIApprovalTopic:
+    Type: String
+  GitHubSecretToken:
+    Type: String
+  GitHubOAuthToken:
+    Type: String
+  VerBuildArn:
+    Type: String
+
+Resources:
+  DeploymentPipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Properties:
+      ArtifactStore:
+        Location:
+          Fn::Sub: ${OutputBucket}
+        Type: S3
+      Name: !Sub a${AssetInsightId}-${ServiceName}-${ProjectName}-deployment-${Region}
+      RoleArn:
+        Ref: "BuildRoleArn"
+      Stages:
+        - Actions:
+            - ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+                Version: '1'
+              Configuration:
+                Owner: tr
+                Repo: !Ref GitHubProjectName
+                PollForSourceChanges: false
+                Branch: !Ref GitHubBranchName
+                OAuthToken: !Ref GitHubOAuthToken
+              Name: Source
+              OutputArtifacts:
+                - Name: CONFIG
+              RunOrder: 1
+          Name: Source
+        - Actions:
+            - ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref AppBuildArn
+              InputArtifacts:
+                - Name: CONFIG
+              OutputArtifacts:
+                - Name: APP
+              Name: App-Build
+              RunOrder: 1
+          Name: App-Build
+        - Actions:
+          - ActionTypeId:
+              Category: Build
+              Owner: AWS
+              Provider: CodeBuild
+              Version: '1'
+            Configuration:
+              ProjectName: !Ref VerBuildArn
+            InputArtifacts:
+              - Name: APP
+            Name: StaticAnalysis
+            RunOrder: 1
+          Name: Security-Scan
+        - Actions:
+          - ActionTypeId:
+              Category: Build
+              Owner: AWS
+              Provider: CodeBuild
+              Version: '1'
+            Configuration:
+              ProjectName: !Ref DEVIACBuildArn
+            InputArtifacts:
+              - Name: APP
+            OutputArtifacts:
+              - Name: DEVIACOUT
+            Name: dev-IAC-Build
+            RunOrder: 1
+          Name: dev-app-Deploy
+        - Actions:
+          - ActionTypeId:
+              Category: Approval
+              Owner: AWS
+              Provider: Manual
+              Version: '1'
+            Name: ci-Approval
+            Configuration:
+              NotificationArn: !Ref CIApprovalTopic
+            RunOrder: 1
+          Name: ci-approval
+        - Actions:
+          - ActionTypeId:
+              Category: Invoke
+              Owner: AWS
+              Provider: Lambda
+              Version: '1'
+            Configuration:
+              FunctionName: !Ref ChgLambdaName
+              UserParameters: !Sub '{"env":"ci","app":"${ServiceName}","type":[ "app" ], "action":"open"}'
+            Name: ci-app-ChangeOpen
+            RunOrder: 1
+          - ActionTypeId:
+              Category: Build
+              Owner: AWS
+              Provider: CodeBuild
+              Version: '1'
+            Configuration:
+              ProjectName: !Ref CIIACBuildArn
+            InputArtifacts:
+              - Name: APP
+            OutputArtifacts:
+              - Name: CIIACOUT
+            Name: ci-IAC-Build
+            RunOrder: 2
+          - ActionTypeId:
+              Category: Invoke
+              Owner: AWS
+              Provider: Lambda
+              Version: '1'
+            Configuration:
+              FunctionName: !Ref ChgLambdaName
+              UserParameters: !Sub '{"env":"ci","app":"${ServiceName}","type":[ "app" ], "action":"close"}'
+            Name: ci-app-ChangeClose
+            RunOrder: 3
+          Name: ci-app-Deploy
+        - Actions:
+          - ActionTypeId:
+              Category: Approval
+              Owner: AWS
+              Provider: Manual
+              Version: '1'
+            Name: qa-Approval
+            Configuration:
+              NotificationArn: !Ref QAApprovalTopic
+            RunOrder: 1
+          Name: qa-approval
+        - Actions:
+          - ActionTypeId:
+              Category: Invoke
+              Owner: AWS
+              Provider: Lambda
+              Version: '1'
+            Configuration:
+              FunctionName: !Ref ChgLambdaName
+              UserParameters: !Sub '{"env":"qa","app":"${ServiceName}","type":[ "app" ], "action":"open"}'
+            Name: qa-app-ChangeOpen
+            RunOrder: 1
+          - ActionTypeId:
+              Category: Build
+              Owner: AWS
+              Provider: CodeBuild
+              Version: '1'
+            Configuration:
+              ProjectName: !Ref QAIACBuildArn
+            InputArtifacts:
+              - Name: APP
+            OutputArtifacts:
+              - Name: QAIACOUT
+            Name: qa-IAC-Build
+            RunOrder: 2
+          - ActionTypeId:
+              Category: Invoke
+              Owner: AWS
+              Provider: Lambda
+              Version: '1'
+            Configuration:
+              FunctionName: !Ref ChgLambdaName
+              UserParameters: !Sub '{"env":"qa","app":"${ServiceName}","type":[ "app" ], "action":"close"}'
+            Name: qa-app-ChangeClose
+            RunOrder: 3
+          Name: qa-app-Deploy
+        - Actions:
+          - ActionTypeId:
+              Category: Approval
+              Owner: AWS
+              Provider: Manual
+              Version: '1'
+            Name: prod-Approval
+            Configuration:
+              NotificationArn: !Ref PRODApprovalTopic
+            RunOrder: 1
+          Name: prod-approval
+        - Actions:
+          - ActionTypeId:
+              Category: Invoke
+              Owner: AWS
+              Provider: Lambda
+              Version: '1'
+            Configuration:
+              FunctionName: !Ref ChgLambdaName
+              UserParameters: !Sub '{"env":"prod","app":"${ServiceName}","type":[ "app" ], "action":"open"}'
+            Name: prod-app-ChangeOpen
+            RunOrder: 1
+          - ActionTypeId:
+              Category: Build
+              Owner: AWS
+              Provider: CodeBuild
+              Version: '1'
+            Configuration:
+              ProjectName: !Ref PRODIACBuildArn
+            InputArtifacts:
+              - Name: APP
+            OutputArtifacts:
+              - Name: PRODIACOUT
+            Name: prod-IAC-Build
+            RunOrder: 2
+          - ActionTypeId:
+              Category: Invoke
+              Owner: AWS
+              Provider: Lambda
+              Version: '1'
+            Configuration:
+              FunctionName: !Ref ChgLambdaName
+              UserParameters: !Sub '{"env":"prod","app":"${ServiceName}","type":[ "app" ], "action":"close"}'
+            Name: prod-app-ChangeClose
+            RunOrder: 3
+          Name: prod-app-Deploy
+
+  GitHubWebhook:
+    Type: AWS::CodePipeline::Webhook
+    Properties:
+      AuthenticationConfiguration:
+        SecretToken: !Ref GitHubSecretToken
+      Filters:
+        - JsonPath: "$.ref"
+          MatchEquals: refs/heads/master
+      Authentication: GITHUB_HMAC
+      TargetPipeline: !Ref DeploymentPipeline
+      TargetAction: Source
+      Name: !Sub a${AssetInsightId}-${ServiceName}-${ProjectName}-Webhook
+      TargetPipelineVersion: !GetAtt DeploymentPipeline.Version
+      RegisterWithThirdParty: 'true'
+
+Outputs:
+  PipelineArn:
+    Description: Deployment Pipeline ARN
+    Value: !Ref DeploymentPipeline
