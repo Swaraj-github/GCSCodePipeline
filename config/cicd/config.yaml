@@ -1,0 +1,8 @@
+dryrun_enabled: false
+environment_type: DEVELOPMENT
+iam_role: arn:aws:iam::689314585043:role/human-role/a206153-PowerUser2
+notification_emails:
+- TR-DEVOPS-GCS-DSS@thomson.com
+- west.ams-novus@thomsonreuters.com
+stage_order:
+- infra
