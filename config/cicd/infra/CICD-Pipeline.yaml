@@ -1,0 +1,29 @@
+template_path: templates/CICD-Pipeline.yaml
+
+parameters:
+  OutputBucket: {{ var.PipelineOutputBucket }}
+  ServiceName: {{ var.ServiceName }}
+  ProjectName: {{ var.ProjectName }}
+  BuildRoleArn: {{ var.BuildRoleArn }}
+  AssetInsightId: "{{ var.AssetInsightId }}"
+  Region: {{ var.RegionShortName }}
+  AppBuildArn: !stack_output AppBuild::BuildArn
+  DEVIACBuildArn: !stack_output dev-IACBuild::BuildArn
+  CIIACBuildArn: !stack_output ci-IACBuild::BuildArn
+  ChgLambdaName: a206153-snow-change-use1
+  QAIACBuildArn: !stack_output qa-IACBuild::BuildArn
+  PRODIACBuildArn: !stack_output prod-IACBuild::BuildArn
+  GitHubProjectName: {{ var.AppGitHubProjectName }}
+  GitHubBranchName: {{ var.AppGitHubBranch }}
+  GitHubOAuthToken: !parameter_store_lookup /a206153/storage/github/oauth
+  GitHubSecretToken: !parameter_store_lookup /a206153/storage/github/secret
+  PRODApprovalTopic: !stack_output prod-ApprovalTopic::TopicArn
+  QAApprovalTopic: !stack_output qa-ApprovalTopic::TopicArn
+  CIApprovalTopic: !stack_output ci-ApprovalTopic::TopicArn
+  VerBuildArn: !stack_output ver-Build::BuildArn
+
+stack_tags:
+  "tr:financial-identifier": "{{ var.FinancialIdentifier }}"
+  "tr:application-asset-insight-id": "{{ var.AssetInsightId }}"
+  "tr:environment-type": {{ var.CiEnvFullName }}
+  "tr:resource-owner": {{ var.ResourceOwner }}
